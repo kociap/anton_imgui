@@ -1,9 +1,15 @@
-#ifndef ANTON_IMGUI_HPP_INCLUDE
-#define ANTON_IMGUI_HPP_INCLUDE
+#pragma once
+
+#include <anton/slice.hpp>
+#include <anton/string_view.hpp>
+#include <anton/math/vector2.hpp>
+#include <anton/math/vector4.hpp>
 
 namespace anton::imgui {
     class Context;
     class Viewport;
+
+    using Color = math::Vector4;
 
     class Widget_Style {
     public:
@@ -23,8 +29,8 @@ namespace anton::imgui {
     public:
         Color border_color;
         Color background_color;
-        Vector4 border;
-        Vector4 padding;
+        Color border;
+        Color padding;
         Font_Style font;
     };
 
@@ -60,7 +66,7 @@ namespace anton::imgui {
 
     class Input_State {
     public:
-        Vector2 cursor_position;
+        math::Vector2 cursor_position;
         bool left_mouse_button;
         bool right_mouse_button;
     };
@@ -70,8 +76,8 @@ namespace anton::imgui {
 
     class Vertex {
     public:
-        Vector2 position;
-        Vector2 uv;
+        math::Vector2 position;
+        math::Vector2 uv;
         struct Color {
             u8 r;
             u8 g;
@@ -89,14 +95,14 @@ namespace anton::imgui {
         u64 texture;
     };
 
-    atl::Slice<Viewport* const> get_viewports(Context&);
+    Slice<Viewport* const> get_viewports(Context&);
     windowing::Window* get_viewport_native_window(Context&, Viewport&);
-    atl::Slice<Draw_Command const> get_viewport_draw_commands(Context&, Viewport&);
+    Slice<Draw_Command const> get_viewport_draw_commands(Context&, Viewport&);
 
-    atl::Slice<Vertex const> get_vertex_data(Context&);
-    atl::Slice<u32 const> get_index_data(Context&);
+    Slice<Vertex const> get_vertex_data(Context&);
+    Slice<u32 const> get_index_data(Context&);
 
-    void begin_window(Context&, atl::String_View, bool new_viewport = false);
+    void begin_window(Context&, String_View, bool new_viewport = false);
     void end_window(Context&);
 
     enum class Button_State {
@@ -104,13 +110,13 @@ namespace anton::imgui {
     };
 
     // Generic widget to group other widgets and manage layout.
-    void begin_widget(Context&, atl::String_View identifier, Widget_Style options);
+    void begin_widget(Context&, String_View identifier, Widget_Style options);
     void end_widget(Context&);
 
-    void text(Context&, atl::String_View text, Font_Style font);
-    Button_State button(Context&, atl::String_View text);
-    Button_State button(Context&, atl::String_View text, Button_Style style, Button_Style hovered_style, Button_Style active_style);
-    void image(Context&, u64 texture, Vector2 size, Vector2 uv_top_left, Vector2 uv_bottom_right);
+    void text(Context&, String_View text, Font_Style font);
+    Button_State button(Context&, String_View text);
+    Button_State button(Context&, String_View text, Button_Style style, Button_Style hovered_style, Button_Style active_style);
+    void image(Context&, u64 texture, math::Vector2 size, math::Vector2 uv_top_left, math::Vector2 uv_bottom_right);
 
     // Modifiers
 
@@ -126,24 +132,22 @@ namespace anton::imgui {
     // a viewport, in which case both the window and the viewport are resized.
     // Otherwise this function has no effect.
     //
-    void set_window_size(Context&, Vector2 size);
+    void set_window_size(Context&, math::Vector2 size);
 
     // Sets the screen position of the current window.
     // This function has any effect only when the current window is the only one in
     // a viewport, in which case both the window and the viewport are repositioned.
     // Otherwise this function has no effect.
     //
-    void set_window_pos(Context&, Vector2 screen_pos);
+    void set_window_pos(Context&, math::Vector2 screen_pos);
 
     void set_width(Context&, f32 width);
     void set_height(Context&, f32 height);
-    Vector2 get_window_dimensions(Context&);
-    Vector2 get_cursor_position(Context&);
+    math::Vector2 get_window_dimensions(Context&);
+    math::Vector2 get_cursor_position(Context&);
 
     // State queries
 
     bool is_window_hot(Context&);
     bool is_window_active(Context&);
 } // namespace anton::imgui
-
-#endif // !ANTON_IMGUI_HPP_INCLUDE

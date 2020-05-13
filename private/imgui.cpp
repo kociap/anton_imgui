@@ -1,5 +1,11 @@
 #include <anton/imgui.hpp>
 
+#include <anton/vector.hpp>
+#include <anton/string.hpp>
+#include <anton/flat_hash_map.hpp>
+#include <anton/utility.hpp>
+#include <anton/assert.hpp>
+
 namespace anton::imgui {
     enum class Layout_Tile_Type {
         root,
@@ -12,8 +18,8 @@ namespace anton::imgui {
     public:
         Layout_Tile* layout_parent = nullptr;
         Layout_Tile_Type tile_type;
-        Vector2 size;
-        Vector2 position;
+        math::Vector2 size;
+        math::Vector2 position;
     };
 
     class Layout_Root: public Layout_Tile {
@@ -23,39 +29,39 @@ namespace anton::imgui {
 
     class Layout: public Layout_Tile {
     public:
-        atl::Vector<Layout_Tile*> tiles;
+        Vector<Layout_Tile*> tiles;
     };
 
     class Dockspace: public Layout_Tile {
     public:
-        atl::Vector<i64> windows;
+        Vector<i64> windows;
         i64 active_window = -1;
         Viewport* viewport = nullptr;
-        // Vector2 position;
+        // math::Vector2 position;
         // Size of content area.
-        Vector2 content_size;
+        math::Vector2 content_size;
         // TODO: Hardcoded. Compute from font size.
         f32 tab_bar_height = 20;
     };
 
     class Draw_Context {
     public:
-        Vector2 draw_pos;
-        atl::Vector<Draw_Command> draw_commands;
-        atl::Vector<Vertex> vertex_buffer;
-        atl::Vector<u32> index_buffer;
+        math::Vector2 draw_pos;
+        Vector<Draw_Command> draw_commands;
+        Vector<Vertex> vertex_buffer;
+        Vector<u32> index_buffer;
     };
 
     class Window {
     public:
-        atl::String _debug_name;
+        String _debug_name;
         Style style;
         i64 id;
         Dockspace* dockspace;
         f32 border_area_width;
         bool enabled;
         // TODO: Rename to make multi-purpose.
-        atl::Flat_Hash_Map<i64, Button_State> button_state;
+        Flat_Hash_Map<i64, Button_State> button_state;
         Draw_Context draw_context;
     };
 
@@ -64,24 +70,24 @@ namespace anton::imgui {
         // -1 if window, otherwise index into widgets in Window
         i64 parent;
         // Used by text widget
-        atl::String text;
+        String text;
         Widget_Style style;
         // Used for layout calculations
-        Vector2 size;
+        math::Vector2 size;
     };
 
     class Viewport {
     public:
         Context* context;
         windowing::Window* native_window = nullptr;
-        atl::Vector<Draw_Command> draw_commands_buffer;
-        atl::Vector<Dockspace*> dockspaces;
+        Vector<Draw_Command> draw_commands_buffer;
+        Vector<Dockspace*> dockspaces;
         Layout_Root layout_root;
     };
 
     class Context {
     public:
-        atl::Flat_Hash_Map<i64, Window> windows;
+        Flat_Hash_Map<i64, Window> windows;
         i64 hot_window = -1;
         i64 active_window = -1;
         // Currently bound window.
@@ -89,17 +95,17 @@ namespace anton::imgui {
         i64 current_widget = -1;
         Input_State input = {};
         Input_State prev_input = {};
-        atl::Vector<Widget> widgets;
-        atl::Vector<i64> widget_stack;
+        Vector<Widget> widgets;
+        Vector<i64> widget_stack;
         Style default_style;
         Font_Style default_font_style;
         Settings settings;
-        atl::Vector<Vertex> vertex_buffer;
-        atl::Vector<u32> index_buffer;
+        Vector<Vertex> vertex_buffer;
+        Vector<u32> index_buffer;
         Viewport* main_viewport;
         // Stores viewports in their z-order (most recent at the end).
-        atl::Vector<Viewport*> viewports;
-        atl::Vector<Dockspace*> dockspaces;
+        Vector<Viewport*> viewports;
+        Vector<Dockspace*> dockspaces;
         Viewport* dragged_viewport = nullptr;
         bool dragging = false;
         bool clicked_tab = false;
@@ -109,8 +115,8 @@ namespace anton::imgui {
             // Is only set when the user repositions a tab within a dockspace.
             Dockspace* alien_dockspace = nullptr;
             Dockspace* hot_dockspace = nullptr;
-            Vector2 original_size;
-            Vector2 tab_click_offset;
+            math::Vector2 original_size;
+            math::Vector2 tab_click_offset;
         } drag;
     };
 
@@ -119,19 +125,19 @@ namespace anton::imgui {
                 (u8)math::clamp(255.0f * c.a, 0.0f, 255.0f)};
     }
 
-    static bool test_cursor_in_box(Vector2 const cursor, Vector2 const position, Vector2 const size) {
+    static bool test_cursor_in_box(math::Vector2 const cursor, math::Vector2 const position, math::Vector2 const size) {
         bool const in_box_x = cursor.x >= position.x && cursor.x < position.x + size.x;
         bool const in_box_y = cursor.y >= position.y && cursor.y < position.y + size.y;
         return in_box_x && in_box_y;
     }
 
-    static bool test_point_in_box(Vector2 const point, Vector2 const position, Vector2 const size) {
+    static bool test_point_in_box(math::Vector2 const point, math::Vector2 const position, math::Vector2 const size) {
         bool const in_box_x = point.x >= position.x && point.x < position.x + size.x;
         bool const in_box_y = point.y >= position.y && point.y < position.y + size.y;
         return in_box_x && in_box_y;
     }
 
-    static i64 hash_string(atl::String_View string) {
+    static i64 hash_string(String_View string) {
         return murmurhash2_32(string.data(), string.size_bytes());
     }
 
@@ -180,7 +186,7 @@ namespace anton::imgui {
         }
     }
 
-    static Viewport* create_viewport(Context& ctx, Vector2 const size, bool const decorated) {
+    static Viewport* create_viewport(Context& ctx, math::Vector2 const size, bool const decorated) {
         Viewport* viewport = new Viewport;
         viewport->native_window = windowing::create_window(size.x, size.y, decorated);
         windowing::set_window_activate_callback(viewport->native_window, _viewport_activate_callback, viewport);
@@ -205,23 +211,23 @@ namespace anton::imgui {
         delete viewport;
     }
 
-    static Vector2 get_viewport_position(Viewport* const viewport) {
+    static math::Vector2 get_viewport_position(Viewport* const viewport) {
         return windowing::get_window_pos(viewport->native_window);
     }
 
-    static Vector2 get_viewport_screen_pos(Viewport* const viewport) {
+    static math::Vector2 get_viewport_screen_pos(Viewport* const viewport) {
         return windowing::get_window_pos(viewport->native_window);
     }
 
-    static Vector2 get_viewport_size(Viewport* const viewport) {
+    static math::Vector2 get_viewport_size(Viewport* const viewport) {
         return windowing::get_window_size(viewport->native_window);
     }
 
-    static void set_viewport_screen_pos(Viewport* const viewport, Vector2 const pos) {
+    static void set_viewport_screen_pos(Viewport* const viewport, math::Vector2 const pos) {
         windowing::set_window_pos(viewport->native_window, pos);
     }
 
-    static void set_viewport_size(Viewport* const viewport, Vector2 const size) {
+    static void set_viewport_size(Viewport* const viewport, math::Vector2 const size) {
         windowing::set_size(viewport->native_window, size);
         viewport->layout_root.size = size;
     }
@@ -242,7 +248,7 @@ namespace anton::imgui {
         }
     }
 
-    static Viewport* find_viewport_under_cursor(Context& ctx, Vector2 const cursor, atl::Slice<Viewport const* const> const exclude) {
+    static Viewport* find_viewport_under_cursor(Context& ctx, math::Vector2 const cursor, Slice<Viewport const* const> const exclude) {
         for(auto i = ctx.viewports.end() - 1, end = ctx.viewports.begin() - 1; i != end; --i) {
             Viewport* const viewport = *i;
             bool excluded = false;
@@ -251,8 +257,8 @@ namespace anton::imgui {
             }
 
             // TODO: Should use whole viewport size instead of only the content area?
-            Vector2 const pos = get_viewport_screen_pos(viewport);
-            Vector2 const size = get_viewport_size(viewport);
+            math::Vector2 const pos = get_viewport_screen_pos(viewport);
+            math::Vector2 const size = get_viewport_size(viewport);
             if(!excluded && test_point_in_box(cursor, pos, size)) {
                 return viewport;
             }
@@ -308,27 +314,27 @@ namespace anton::imgui {
         }
     }
 
-    static Vector2 get_dockspace_screen_pos(Dockspace const* const dockspace) {
+    static math::Vector2 get_dockspace_screen_pos(Dockspace const* const dockspace) {
         return dockspace->position + get_viewport_position(dockspace->viewport);
     }
 
-    static Vector2 get_dockspace_content_screen_pos(Dockspace const* const dockspace) {
-        return dockspace->position + get_viewport_position(dockspace->viewport) + Vector2{0.0f, dockspace->tab_bar_height};
+    static math::Vector2 get_dockspace_content_screen_pos(Dockspace const* const dockspace) {
+        return dockspace->position + get_viewport_position(dockspace->viewport) + math::Vector2{0.0f, dockspace->tab_bar_height};
     }
 
-    static Vector2 get_dockspace_size(Dockspace const* const dockspace) {
-        return dockspace->content_size + Vector2{0.0f, dockspace->tab_bar_height};
+    static math::Vector2 get_dockspace_size(Dockspace const* const dockspace) {
+        return dockspace->content_size + math::Vector2{0.0f, dockspace->tab_bar_height};
     }
 
-    static Vector2 get_dockspace_content_size(Dockspace const* const dockspace) {
+    static math::Vector2 get_dockspace_content_size(Dockspace const* const dockspace) {
         return dockspace->content_size;
     }
 
-    static Vector2 get_dockspace_tab_bar_screen_pos(Dockspace const* const dockspace) {
+    static math::Vector2 get_dockspace_tab_bar_screen_pos(Dockspace const* const dockspace) {
         return dockspace->position + get_viewport_position(dockspace->viewport);
     }
 
-    static Vector2 get_dockspace_tab_bar_size(Dockspace const* const dockspace) {
+    static math::Vector2 get_dockspace_tab_bar_size(Dockspace const* const dockspace) {
         return {dockspace->size.x, dockspace->tab_bar_height};
     }
 
@@ -355,17 +361,17 @@ namespace anton::imgui {
         return dockspace->content_size.x / tab_count;
     }
 
-    static Dockspace* find_dockspace_under_cursor(Context& ctx, Vector2 const cursor, atl::Slice<Dockspace const* const> const exclude) {
+    static Dockspace* find_dockspace_under_cursor(Context& ctx, math::Vector2 const cursor, Slice<Dockspace const* const> const exclude) {
         for(auto i = ctx.viewports.end() - 1, end = ctx.viewports.begin() - 1; i != end; --i) {
-            atl::Vector<Dockspace*> dockspaces = (**i).dockspaces;
+            Vector<Dockspace*> dockspaces = (**i).dockspaces;
             for(Dockspace* const dockspace: dockspaces) {
                 bool excluded = false;
                 for(Dockspace const* const excluded_docksapce: exclude) {
                     excluded |= excluded_docksapce == dockspace;
                 }
 
-                Vector2 const pos = get_dockspace_screen_pos(dockspace);
-                Vector2 const size = get_dockspace_size(dockspace);
+                math::Vector2 const pos = get_dockspace_screen_pos(dockspace);
+                math::Vector2 const size = get_dockspace_size(dockspace);
                 if(!excluded && test_point_in_box(cursor, pos, size)) {
                     return dockspace;
                 }
@@ -409,7 +415,7 @@ namespace anton::imgui {
 
         case Layout_Tile_Type::horizontal_layout: {
             Layout* layout = (Layout*)tile;
-            Vector2 const available_space = layout->size;
+            math::Vector2 const available_space = layout->size;
             f32 prev_width = 0.0f;
             for(Layout_Tile* child: layout->tiles) {
                 prev_width += child->size.x;
@@ -417,22 +423,22 @@ namespace anton::imgui {
 
             if(prev_width == 0.0f) {
                 f32 pos_offset = 0.0f;
-                Vector2 const parent_pos = layout->position;
-                Vector2 const child_size = {available_space.x / layout->tiles.size(), available_space.y};
+                math::Vector2 const parent_pos = layout->position;
+                math::Vector2 const child_size = {available_space.x / layout->tiles.size(), available_space.y};
                 for(Layout_Tile* child: layout->tiles) {
                     child->size = child_size;
-                    child->position = parent_pos + Vector2{pos_offset, 0.0f};
+                    child->position = parent_pos + math::Vector2{pos_offset, 0.0f};
                     pos_offset += child_size.x;
                     recalculate_sublayout_size(child);
                 }
             } else {
                 f32 pos_offset = 0.0f;
-                Vector2 const parent_pos = layout->position;
+                math::Vector2 const parent_pos = layout->position;
                 f32 const size_factor = available_space.x / prev_width;
                 for(Layout_Tile* child: layout->tiles) {
-                    Vector2 const new_size = {child->size.x * size_factor, available_space.y};
+                    math::Vector2 const new_size = {child->size.x * size_factor, available_space.y};
                     child->size = new_size;
-                    child->position = parent_pos + Vector2{pos_offset, 0.0f};
+                    child->position = parent_pos + math::Vector2{pos_offset, 0.0f};
                     pos_offset += new_size.x;
                     recalculate_sublayout_size(child);
                 }
@@ -441,7 +447,7 @@ namespace anton::imgui {
 
         case Layout_Tile_Type::vertical_layout: {
             Layout* layout = (Layout*)tile;
-            Vector2 const available_space = layout->size;
+            math::Vector2 const available_space = layout->size;
             f32 prev_height = 0.0f;
             for(Layout_Tile* child: layout->tiles) {
                 prev_height += child->size.y;
@@ -449,22 +455,22 @@ namespace anton::imgui {
 
             if(prev_height == 0.0f) {
                 f32 pos_offset = 0.0f;
-                Vector2 const parent_pos = layout->position;
-                Vector2 const child_size = {available_space.x, available_space.y / layout->tiles.size()};
+                math::Vector2 const parent_pos = layout->position;
+                math::Vector2 const child_size = {available_space.x, available_space.y / layout->tiles.size()};
                 for(Layout_Tile* child: layout->tiles) {
                     child->size = child_size;
-                    child->position = parent_pos + Vector2{0.0f, pos_offset};
+                    child->position = parent_pos + math::Vector2{0.0f, pos_offset};
                     pos_offset += child_size.x;
                     recalculate_sublayout_size(child);
                 }
             } else {
                 f32 pos_offset = 0.0f;
-                Vector2 const parent_pos = layout->position;
+                math::Vector2 const parent_pos = layout->position;
                 f32 const size_factor = available_space.y / prev_height;
                 for(Layout_Tile* child: layout->tiles) {
-                    Vector2 const new_size = {available_space.x, child->size.y * size_factor};
+                    math::Vector2 const new_size = {available_space.x, child->size.y * size_factor};
                     child->size = new_size;
-                    child->position = parent_pos + Vector2{0.0f, pos_offset};
+                    child->position = parent_pos + math::Vector2{0.0f, pos_offset};
                     pos_offset += new_size.y;
                     recalculate_sublayout_size(child);
                 }
@@ -473,8 +479,8 @@ namespace anton::imgui {
 
         case Layout_Tile_Type::dockspace: {
             Dockspace* const dockspace = (Dockspace*)tile;
-            Vector2 const tab_bar_size = get_dockspace_tab_bar_size(dockspace);
-            dockspace->content_size = dockspace->size - Vector2{0.0f, tab_bar_size.y};
+            math::Vector2 const tab_bar_size = get_dockspace_tab_bar_size(dockspace);
+            dockspace->content_size = dockspace->size - math::Vector2{0.0f, tab_bar_size.y};
             // Nothing to do
         } break;
         }
@@ -773,11 +779,11 @@ namespace anton::imgui {
     // Assumes the cursor is inside the window.
     // returns -1 if cursor is not in the border area of a window.
     // returns 0 if cursor is in top border area, 1 if right, 2 if bottom, 3 if left.
-    static i32 check_cursor_in_border_area(Vector2 const cursor_pos, Vector2 const pos, Vector2 const size, Vector2 const border_area_width) {
-        Vector2 const aspect = {size.y / size.x, 1.0f};
-        Vector2 const size_a = {size.y, size.y};
-        Vector2 const cursor_a = (cursor_pos - pos) * aspect;
-        Vector2 const border_a = border_area_width * aspect;
+    static i32 check_cursor_in_border_area(math::Vector2 const cursor_pos, math::Vector2 const pos, math::Vector2 const size, math::Vector2 const border_area_width) {
+        math::Vector2 const aspect = {size.y / size.x, 1.0f};
+        math::Vector2 const size_a = {size.y, size.y};
+        math::Vector2 const cursor_a = (cursor_pos - pos) * aspect;
+        math::Vector2 const border_a = border_area_width * aspect;
         if(!test_point_in_box(cursor_a, border_a, size_a - 2 * border_a)) {
             f32 const dist_top = cursor_a.y;
             f32 const dist_bottom = size_a.y - cursor_a.y;
@@ -799,7 +805,7 @@ namespace anton::imgui {
     }
 
     static void process_input(Context& ctx) {
-        Vector2 const cursor = ctx.input.cursor_position;
+        math::Vector2 const cursor = ctx.input.cursor_position;
         bool const just_left_clicked = !ctx.prev_input.left_mouse_button && ctx.input.left_mouse_button;
         bool const just_left_released = ctx.prev_input.left_mouse_button && !ctx.input.left_mouse_button;
         // TODO: Hoist hot window search.
@@ -811,11 +817,11 @@ namespace anton::imgui {
                     Dockspace* const dockspace = window.dockspace;
                     dockspace->active_window = window.id;
 
-                    Vector2 const dockspace_pos = get_dockspace_screen_pos(dockspace);
-                    Vector2 const tab_size = {compute_tab_width(dockspace), dockspace->tab_bar_height};
+                    math::Vector2 const dockspace_pos = get_dockspace_screen_pos(dockspace);
+                    math::Vector2 const tab_size = {compute_tab_width(dockspace), dockspace->tab_bar_height};
                     i64 const tab_count = dockspace->windows.size();
                     for(i64 i = 0; i < tab_count; i += 1) {
-                        Vector2 const tab_pos = dockspace_pos + Vector2{tab_size.x * i, 0.0f};
+                        math::Vector2 const tab_pos = dockspace_pos + math::Vector2{tab_size.x * i, 0.0f};
                         if(test_cursor_in_box(cursor, tab_pos, tab_size)) {
                             ctx.clicked_tab = true;
                             ctx.drag.tab_click_offset = cursor - tab_pos;
@@ -827,8 +833,8 @@ namespace anton::imgui {
         } else if(ctx.input.left_mouse_button) {
             if(ctx.active_window != -1) {
                 Window& window = ctx.windows.find(ctx.active_window)->value;
-                Vector2 const cursor_pos_delta = ctx.input.cursor_position - ctx.prev_input.cursor_position;
-                // ANTON_LOG_INFO("cursor_pos_delta: " + atl::to_string(cursor_pos_delta.x) + " " + atl::to_string(cursor_pos_delta.y));
+                math::Vector2 const cursor_pos_delta = ctx.input.cursor_position - ctx.prev_input.cursor_position;
+                // ANTON_LOG_INFO("cursor_pos_delta: " + to_string(cursor_pos_delta.x) + " " + to_string(cursor_pos_delta.y));
                 if(ctx.dragging) {
                     ctx.drag.hot_dockspace = find_dockspace_under_cursor(ctx, cursor, {&window.dockspace, 1});
 
@@ -838,7 +844,7 @@ namespace anton::imgui {
                         if(test_cursor_in_box(cursor, get_dockspace_screen_pos(alien_dockspace), get_dockspace_tab_bar_size(alien_dockspace))) {
                             // We are still in tab bar. Update tab position.
                             f32 const tab_width = compute_tab_width(alien_dockspace);
-                            Vector2 const dockspace_pos = get_dockspace_screen_pos(alien_dockspace);
+                            math::Vector2 const dockspace_pos = get_dockspace_screen_pos(alien_dockspace);
                             f32 const offset = cursor.x - dockspace_pos.x;
                             i64 const index = math::floor(offset / tab_width);
                             i64 const current_tab_index = get_tab_index(alien_dockspace, window.id);
@@ -857,7 +863,7 @@ namespace anton::imgui {
                             parent_to_root(dockspace, viewport);
                             f32 const tab_offset = compute_tab_width(ctx.drag.alien_dockspace);
                             i64 const tab_index = get_tab_index(ctx.drag.alien_dockspace, window.id);
-                            Vector2 const new_pos = cursor - ctx.drag.tab_click_offset;
+                            math::Vector2 const new_pos = cursor - ctx.drag.tab_click_offset;
                             set_viewport_screen_pos(viewport, new_pos);
 
                             ctx.drag.alien_dockspace = nullptr;
@@ -867,7 +873,7 @@ namespace anton::imgui {
                     }
                 }
 
-                if(ctx.clicked_tab && !ctx.dragging && cursor_pos_delta != Vector2{0.0f, 0.0f}) {
+                if(ctx.clicked_tab && !ctx.dragging && cursor_pos_delta != math::Vector2{0.0f, 0.0f}) {
                     ctx.dragging = true;
                     ctx.drag.original_size = window.dockspace->size;
                     if(window.dockspace->windows.size() == 1) {
@@ -875,10 +881,10 @@ namespace anton::imgui {
                         Viewport* const current_viewport = dockspace->viewport;
                         // Prevent main viewport from being moved by the dockspaces.
                         if(current_viewport->dockspaces.size() == 1 && current_viewport != ctx.viewports[0]) {
-                            Vector2 const current_pos = get_viewport_screen_pos(current_viewport);
+                            math::Vector2 const current_pos = get_viewport_screen_pos(current_viewport);
                             set_viewport_screen_pos(current_viewport, current_pos + cursor_pos_delta);
                         } else {
-                            Vector2 const current_pos = get_dockspace_screen_pos(dockspace);
+                            math::Vector2 const current_pos = get_dockspace_screen_pos(dockspace);
                             Viewport* const viewport = create_viewport(ctx, get_dockspace_size(dockspace), false);
                             set_viewport_screen_pos(viewport, current_pos + cursor_pos_delta);
                             unparent(dockspace);
@@ -898,7 +904,7 @@ namespace anton::imgui {
                             parent_to_root(dockspace, viewport);
                             i64 const tab_index = get_tab_index(prev_dockspace, prev_dockspace->active_window);
                             f32 const tab_width = compute_tab_width(prev_dockspace);
-                            set_viewport_screen_pos(viewport, get_dockspace_screen_pos(prev_dockspace) + Vector2{tab_index * tab_width, 0} + cursor_pos_delta);
+                            set_viewport_screen_pos(viewport, get_dockspace_screen_pos(prev_dockspace) + math::Vector2{tab_index * tab_width, 0} + cursor_pos_delta);
                         }
                     }
                 }
@@ -921,12 +927,12 @@ namespace anton::imgui {
                     } else {
                         Dockspace* const dockspace = find_dockspace_under_cursor(ctx, cursor, {&window.dockspace, 1});
                         if(dockspace) {
-                            Vector2 const dockspace_content_pos = get_dockspace_content_screen_pos(dockspace);
-                            Vector2 const dockspace_content_size = get_dockspace_content_size(dockspace);
-                            Vector2 const dockspace_tab_bar_screen_pos = get_dockspace_tab_bar_screen_pos(dockspace);
-                            Vector2 const dockspace_tab_bar_size = get_dockspace_tab_bar_size(dockspace);
+                            math::Vector2 const dockspace_content_pos = get_dockspace_content_screen_pos(dockspace);
+                            math::Vector2 const dockspace_content_size = get_dockspace_content_size(dockspace);
+                            math::Vector2 const dockspace_tab_bar_screen_pos = get_dockspace_tab_bar_screen_pos(dockspace);
+                            math::Vector2 const dockspace_tab_bar_size = get_dockspace_tab_bar_size(dockspace);
                             if(test_point_in_box(cursor, dockspace_content_pos, dockspace_content_size)) {
-                                Vector2 const border_area_width = dockspace_content_size * 0.5f * ctx.settings.window_drop_area_width;
+                                math::Vector2 const border_area_width = dockspace_content_size * 0.5f * ctx.settings.window_drop_area_width;
                                 i32 const border_section =
                                     check_cursor_in_border_area(cursor, dockspace_content_pos, dockspace_content_size, border_area_width);
                                 switch(border_section) {
@@ -951,7 +957,7 @@ namespace anton::imgui {
                                 // Add window to tab bar.
                                 i64 const tab_count = get_tab_count(dockspace);
                                 f32 const tab_width = compute_tab_width(dockspace, tab_count + 1);
-                                Vector2 const dockspace_pos = get_dockspace_screen_pos(dockspace);
+                                math::Vector2 const dockspace_pos = get_dockspace_screen_pos(dockspace);
                                 f32 const offset = cursor.x - dockspace_pos.x;
                                 i64 const index = math::floor(offset / tab_width);
                                 destroy_viewport(ctx, current_viewport);
@@ -973,16 +979,16 @@ namespace anton::imgui {
             Dockspace* const hot_dockspace = find_dockspace_under_cursor(ctx, cursor, {});
 
             if(hot_dockspace) {
-                Vector2 const hot_dockspace_pos = get_dockspace_screen_pos(hot_dockspace);
-                Vector2 const content_pos = get_dockspace_content_screen_pos(hot_dockspace);
-                Vector2 const hot_dockspace_size = get_dockspace_size(hot_dockspace);
+                math::Vector2 const hot_dockspace_pos = get_dockspace_screen_pos(hot_dockspace);
+                math::Vector2 const content_pos = get_dockspace_content_screen_pos(hot_dockspace);
+                math::Vector2 const hot_dockspace_size = get_dockspace_size(hot_dockspace);
                 if(test_cursor_in_box(cursor, content_pos, hot_dockspace_size)) {
                     ctx.hot_window = hot_dockspace->active_window;
                 } else {
-                    Vector2 const tab_size = {hot_dockspace_size.x / hot_dockspace->windows.size(), hot_dockspace->tab_bar_height};
+                    math::Vector2 const tab_size = {hot_dockspace_size.x / hot_dockspace->windows.size(), hot_dockspace->tab_bar_height};
                     f32 tab_offset = 0;
                     for(i64 i = 0; i < hot_dockspace->windows.size(); i += 1) {
-                        Vector2 const tab_pos = hot_dockspace_pos + Vector2{tab_offset, 0.0f};
+                        math::Vector2 const tab_pos = hot_dockspace_pos + math::Vector2{tab_offset, 0.0f};
                         if(test_cursor_in_box(cursor, tab_pos, tab_size)) {
                             ctx.hot_window = hot_dockspace->windows[i];
                             break;
@@ -1007,7 +1013,7 @@ namespace anton::imgui {
 
         for(auto [_, window]: ctx.windows) {
             window.enabled = false;
-            window.draw_context.draw_pos = Vector2{0.0f, 0.0f};
+            window.draw_context.draw_pos = math::Vector2{0.0f, 0.0f};
             window.draw_context.index_buffer.clear();
             window.draw_context.vertex_buffer.clear();
             window.draw_context.draw_commands.clear();
@@ -1017,7 +1023,7 @@ namespace anton::imgui {
     }
 
     // From top-left counterclockwise order of vertices.
-    static void add_quad(atl::Vector<Vertex>& verts, atl::Vector<u32>& indices, Vertex v1, Vertex v2, Vertex v3, Vertex v4, u32 inx1, u32 inx2, u32 inx3,
+    static void add_quad(Vector<Vertex>& verts, Vector<u32>& indices, Vertex v1, Vertex v2, Vertex v3, Vertex v4, u32 inx1, u32 inx2, u32 inx3,
                          u32 inx4, u32 inx5, u32 inx6) {
         verts.emplace_back(v1);
         verts.emplace_back(v2);
@@ -1071,21 +1077,21 @@ namespace anton::imgui {
         auto& verts = ctx.vertex_buffer;
         auto& indices = ctx.index_buffer;
         for(Dockspace const* const dockspace: ctx.dockspaces) {
-            atl::Vector<Draw_Command>& draw_cmd_buffer = dockspace->viewport->draw_commands_buffer;
-            Vector2 const dockspace_pos = get_dockspace_screen_pos(dockspace);
-            Vector2 const dockspace_size = get_dockspace_size(dockspace);
-            Vector2 const dockspace_content_pos = get_dockspace_content_screen_pos(dockspace);
-            Vector2 const dockspace_content_size = get_dockspace_content_size(dockspace);
+            Vector<Draw_Command>& draw_cmd_buffer = dockspace->viewport->draw_commands_buffer;
+            math::Vector2 const dockspace_pos = get_dockspace_screen_pos(dockspace);
+            math::Vector2 const dockspace_size = get_dockspace_size(dockspace);
+            math::Vector2 const dockspace_content_pos = get_dockspace_content_screen_pos(dockspace);
+            math::Vector2 const dockspace_content_size = get_dockspace_content_size(dockspace);
 
             // Tab bar background
             Draw_Command tab_bar_cmd;
             tab_bar_cmd.vertex_offset = verts.size();
             // TODO: Make color customizable.
             Vertex::Color const tab_bar_color = color_to_vertex_color(ctx.default_style.background_color);
-            verts.emplace_back(dockspace_pos, Vector2{0.0f, 1.0f}, tab_bar_color);
-            verts.emplace_back(dockspace_pos + Vector2{0, dockspace->tab_bar_height}, Vector2{0.0f, 0.0f}, tab_bar_color);
-            verts.emplace_back(dockspace_pos + Vector2{dockspace_size.x, dockspace->tab_bar_height}, Vector2{1.0f, 0.0f}, tab_bar_color);
-            verts.emplace_back(dockspace_pos + Vector2{dockspace_size.x, 0}, Vector2{1.0f, 1.0f}, tab_bar_color);
+            verts.emplace_back(dockspace_pos, math::Vector2{0.0f, 1.0f}, tab_bar_color);
+            verts.emplace_back(dockspace_pos + math::Vector2{0, dockspace->tab_bar_height}, math::Vector2{0.0f, 0.0f}, tab_bar_color);
+            verts.emplace_back(dockspace_pos + math::Vector2{dockspace_size.x, dockspace->tab_bar_height}, math::Vector2{1.0f, 0.0f}, tab_bar_color);
+            verts.emplace_back(dockspace_pos + math::Vector2{dockspace_size.x, 0}, math::Vector2{1.0f, 1.0f}, tab_bar_color);
             tab_bar_cmd.index_offset = indices.size();
             indices.push_back(0);
             indices.push_back(1);
@@ -1111,13 +1117,13 @@ namespace anton::imgui {
                 // Vertex::Color const tab_color =
                 //     (id == ctx.hot_window || id == ctx.active_window ? Vertex::Color{255, 187, 61, 255}
                 //                                                      : Vertex::Color{224, 138, 0, 255}); // Vertex::Color{255, 157, 0, 255}
-                Vector2 const tab_pos = dockspace_pos + Vector2{tab_offset, 0};
+                math::Vector2 const tab_pos = dockspace_pos + math::Vector2{tab_offset, 0};
                 Draw_Command cmd;
                 cmd.vertex_offset = verts.size();
-                verts.emplace_back(tab_pos, Vector2{0.0f, 1.0f}, tab_color);
-                verts.emplace_back(tab_pos + Vector2{0.0f, dockspace->tab_bar_height}, Vector2{0.0f, 0.0f}, tab_color);
-                verts.emplace_back(tab_pos + Vector2{tab_width - separator_width, dockspace->tab_bar_height}, Vector2{1.0f, 0.0f}, tab_color);
-                verts.emplace_back(tab_pos + Vector2{tab_width - separator_width, 0.0f}, Vector2{1.0f, 1.0f}, tab_color);
+                verts.emplace_back(tab_pos, math::Vector2{0.0f, 1.0f}, tab_color);
+                verts.emplace_back(tab_pos + math::Vector2{0.0f, dockspace->tab_bar_height}, math::Vector2{0.0f, 0.0f}, tab_color);
+                verts.emplace_back(tab_pos + math::Vector2{tab_width - separator_width, dockspace->tab_bar_height}, math::Vector2{1.0f, 0.0f}, tab_color);
+                verts.emplace_back(tab_pos + math::Vector2{tab_width - separator_width, 0.0f}, math::Vector2{1.0f, 1.0f}, tab_color);
                 cmd.index_offset = indices.size();
                 indices.push_back(0);
                 indices.push_back(1);
@@ -1132,13 +1138,13 @@ namespace anton::imgui {
 
                 // TODO: Temporarily added tab separators.
                 Vertex::Color const separator_color = {50, 50, 50, 255};
-                Vector2 const separator_pos = dockspace_pos + Vector2{tab_offset + tab_width - separator_width, 0};
+                math::Vector2 const separator_pos = dockspace_pos + math::Vector2{tab_offset + tab_width - separator_width, 0};
                 Draw_Command separator_cmd;
                 separator_cmd.vertex_offset = verts.size();
-                verts.emplace_back(separator_pos, Vector2{0.0f, 1.0f}, separator_color);
-                verts.emplace_back(separator_pos + Vector2{0.0f, dockspace->tab_bar_height}, Vector2{0.0f, 0.0f}, separator_color);
-                verts.emplace_back(separator_pos + Vector2{separator_width, dockspace->tab_bar_height}, Vector2{1.0f, 0.0f}, separator_color);
-                verts.emplace_back(separator_pos + Vector2{separator_width, 0.0f}, Vector2{1.0f, 1.0f}, separator_color);
+                verts.emplace_back(separator_pos, math::Vector2{0.0f, 1.0f}, separator_color);
+                verts.emplace_back(separator_pos + math::Vector2{0.0f, dockspace->tab_bar_height}, math::Vector2{0.0f, 0.0f}, separator_color);
+                verts.emplace_back(separator_pos + math::Vector2{separator_width, dockspace->tab_bar_height}, math::Vector2{1.0f, 0.0f}, separator_color);
+                verts.emplace_back(separator_pos + math::Vector2{separator_width, 0.0f}, math::Vector2{1.0f, 1.0f}, separator_color);
                 separator_cmd.index_offset = indices.size();
                 indices.push_back(0);
                 indices.push_back(1);
@@ -1159,11 +1165,11 @@ namespace anton::imgui {
             Draw_Command cmd;
             cmd.vertex_offset = verts.size();
             Vertex::Color const color = color_to_vertex_color(window.style.background_color);
-            Vector2 const window_pos = dockspace_content_pos;
-            verts.emplace_back(window_pos, Vector2{0.0f, 1.0f}, color);
-            verts.emplace_back(window_pos + Vector2{0, dockspace_content_size.y}, Vector2{0.0f, 0.0f}, color);
-            verts.emplace_back(window_pos + dockspace_content_size, Vector2{1.0f, 0.0f}, color);
-            verts.emplace_back(window_pos + Vector2{dockspace_content_size.x, 0}, Vector2{1.0f, 1.0f}, color);
+            math::Vector2 const window_pos = dockspace_content_pos;
+            verts.emplace_back(window_pos, math::Vector2{0.0f, 1.0f}, color);
+            verts.emplace_back(window_pos + math::Vector2{0, dockspace_content_size.y}, math::Vector2{0.0f, 0.0f}, color);
+            verts.emplace_back(window_pos + dockspace_content_size, math::Vector2{1.0f, 0.0f}, color);
+            verts.emplace_back(window_pos + math::Vector2{dockspace_content_size.x, 0}, math::Vector2{1.0f, 1.0f}, color);
             cmd.index_offset = indices.size();
             indices.push_back(0);
             indices.push_back(1);
@@ -1198,49 +1204,49 @@ namespace anton::imgui {
                 dc.vertex_buffer.clear();
                 dc.index_buffer.clear();
                 dc.draw_commands.clear();
-                dc.draw_pos = Vector2{0.0f, 0.0f};
+                dc.draw_pos = math::Vector2{0.0f, 0.0f};
             }
         }
 
         // Render dockspce drag preview guides
         if(ctx.drag.hot_dockspace) {
             Viewport* const viewport = ctx.drag.hot_dockspace->viewport;
-            Vector2 const dockspace_content_pos = get_dockspace_content_screen_pos(ctx.drag.hot_dockspace);
-            Vector2 const dockspace_content_size = get_dockspace_content_size(ctx.drag.hot_dockspace);
-            Vector2 const dockspace_tab_bar_pos = get_dockspace_tab_bar_screen_pos(ctx.drag.hot_dockspace);
-            Vector2 const dockspace_tab_bar_size = get_dockspace_tab_bar_size(ctx.drag.hot_dockspace);
-            Vector2 const cursor = ctx.input.cursor_position;
+            math::Vector2 const dockspace_content_pos = get_dockspace_content_screen_pos(ctx.drag.hot_dockspace);
+            math::Vector2 const dockspace_content_size = get_dockspace_content_size(ctx.drag.hot_dockspace);
+            math::Vector2 const dockspace_tab_bar_pos = get_dockspace_tab_bar_screen_pos(ctx.drag.hot_dockspace);
+            math::Vector2 const dockspace_tab_bar_size = get_dockspace_tab_bar_size(ctx.drag.hot_dockspace);
+            math::Vector2 const cursor = ctx.input.cursor_position;
             if(test_point_in_box(cursor, dockspace_content_pos, dockspace_content_size)) {
                 // In dockspace's content area.
                 Vertex::Color const color = color_to_vertex_color(ctx.default_style.preview_guides_color);
-                Vector2 const border_area_width = dockspace_content_size * 0.5f * ctx.settings.window_drop_area_width;
+                math::Vector2 const border_area_width = dockspace_content_size * 0.5f * ctx.settings.window_drop_area_width;
 
-                Vector2 const _verts[] = {
+                math::Vector2 const _verts[] = {
                     // outside top-left
-                    dockspace_content_pos + Vector2{1.0f, 0.0f},
-                    dockspace_content_pos + Vector2{0.0f, 1.0f},
+                    dockspace_content_pos + math::Vector2{1.0f, 0.0f},
+                    dockspace_content_pos + math::Vector2{0.0f, 1.0f},
                     // outside top-right
-                    dockspace_content_pos + Vector2{dockspace_content_size.x - 1.0f, 0.0f},
-                    dockspace_content_pos + Vector2{dockspace_content_size.x, 1.0f},
+                    dockspace_content_pos + math::Vector2{dockspace_content_size.x - 1.0f, 0.0f},
+                    dockspace_content_pos + math::Vector2{dockspace_content_size.x, 1.0f},
                     // outside bottom-left
-                    dockspace_content_pos + Vector2{0.0, dockspace_content_size.y - 1.0f},
-                    dockspace_content_pos + Vector2{1.0f, dockspace_content_size.y},
+                    dockspace_content_pos + math::Vector2{0.0, dockspace_content_size.y - 1.0f},
+                    dockspace_content_pos + math::Vector2{1.0f, dockspace_content_size.y},
                     // outside top-right
-                    dockspace_content_pos + dockspace_content_size + Vector2{0.0f, -1.0f},
-                    dockspace_content_pos + dockspace_content_size + Vector2{-1.0f, 0.0f},
+                    dockspace_content_pos + dockspace_content_size + math::Vector2{0.0f, -1.0f},
+                    dockspace_content_pos + dockspace_content_size + math::Vector2{-1.0f, 0.0f},
 
                     // inside top-left
-                    dockspace_content_pos + border_area_width + Vector2{0.0f, -1.0f},
-                    dockspace_content_pos + border_area_width + Vector2{-1.0f, 0.0f},
+                    dockspace_content_pos + border_area_width + math::Vector2{0.0f, -1.0f},
+                    dockspace_content_pos + border_area_width + math::Vector2{-1.0f, 0.0f},
                     // inside top-right
-                    dockspace_content_pos + Vector2{dockspace_content_size.x - border_area_width.x, border_area_width.y - 1.0f},
-                    dockspace_content_pos + Vector2{dockspace_content_size.x - border_area_width.x + 1.0f, border_area_width.y},
+                    dockspace_content_pos + math::Vector2{dockspace_content_size.x - border_area_width.x, border_area_width.y - 1.0f},
+                    dockspace_content_pos + math::Vector2{dockspace_content_size.x - border_area_width.x + 1.0f, border_area_width.y},
                     // inside bottom-left
-                    dockspace_content_pos + Vector2{border_area_width.x - 1.0f, dockspace_content_size.y - border_area_width.y},
-                    dockspace_content_pos + Vector2{border_area_width.x, dockspace_content_size.y - border_area_width.y + 1.0f},
+                    dockspace_content_pos + math::Vector2{border_area_width.x - 1.0f, dockspace_content_size.y - border_area_width.y},
+                    dockspace_content_pos + math::Vector2{border_area_width.x, dockspace_content_size.y - border_area_width.y + 1.0f},
                     // inside bottom-right
-                    dockspace_content_pos + Vector2{dockspace_content_size.x - border_area_width.x + 1.0f, dockspace_content_size.y - border_area_width.y},
-                    dockspace_content_pos + Vector2{dockspace_content_size.x - border_area_width.x, dockspace_content_size.y - border_area_width.y + 1.0f},
+                    dockspace_content_pos + math::Vector2{dockspace_content_size.x - border_area_width.x + 1.0f, dockspace_content_size.y - border_area_width.y},
+                    dockspace_content_pos + math::Vector2{dockspace_content_size.x - border_area_width.x, dockspace_content_size.y - border_area_width.y + 1.0f},
                 };
 
                 u32 const _indices[] = {
@@ -1259,15 +1265,15 @@ namespace anton::imgui {
                 Draw_Command guides_cmd;
                 guides_cmd.vertex_offset = verts.size();
                 guides_cmd.index_offset = indices.size();
-                guides_cmd.element_count = atl::size(_indices);
+                guides_cmd.element_count = size(_indices);
                 guides_cmd.texture = 0;
                 viewport->draw_commands_buffer.emplace_back(guides_cmd);
 
-                for(i64 i = 0; i < (i64)atl::size(_verts); ++i) {
-                    verts.emplace_back(_verts[i], Vector2{0, 0}, color);
+                for(i64 i = 0; i < (i64)size(_verts); ++i) {
+                    verts.emplace_back(_verts[i], math::Vector2{0, 0}, color);
                 }
 
-                for(i64 i = 0; i < (i64)atl::size(_indices); ++i) {
+                for(i64 i = 0; i < (i64)size(_indices); ++i) {
                     indices.emplace_back(_indices[i]);
                 }
 
@@ -1282,10 +1288,10 @@ namespace anton::imgui {
 
                     Vertex::Color const preview_color = color_to_vertex_color(ctx.default_style.preview_color);
                     Dockspace* const dockspace = ctx.drag.hot_dockspace;
-                    Vector2 const dockspace_pos = get_dockspace_screen_pos(dockspace);
-                    Vector2 const dockspace_size = get_dockspace_size(dockspace);
-                    Vector2 preview_pos;
-                    Vector2 preview_size;
+                    math::Vector2 const dockspace_pos = get_dockspace_screen_pos(dockspace);
+                    math::Vector2 const dockspace_size = get_dockspace_size(dockspace);
+                    math::Vector2 preview_pos;
+                    math::Vector2 preview_size;
                     switch(border_section) {
                     case 0: {
                         preview_pos = dockspace_pos;
@@ -1293,12 +1299,12 @@ namespace anton::imgui {
                     } break;
 
                     case 1: {
-                        preview_pos = dockspace_pos + Vector2{dockspace_size.x * 0.5f, 0.0f};
+                        preview_pos = dockspace_pos + math::Vector2{dockspace_size.x * 0.5f, 0.0f};
                         preview_size = {dockspace_size.x * 0.5f, dockspace_size.y};
                     } break;
 
                     case 2: {
-                        preview_pos = dockspace_pos + Vector2{0.0f, dockspace_size.y * 0.5f};
+                        preview_pos = dockspace_pos + math::Vector2{0.0f, dockspace_size.y * 0.5f};
                         preview_size = {dockspace_size.x, dockspace_size.y * 0.5f};
                     } break;
 
@@ -1307,10 +1313,10 @@ namespace anton::imgui {
                         preview_size = {dockspace_size.x * 0.5f, dockspace_size.y};
                     } break;
                     }
-                    verts.emplace_back(preview_pos, Vector2{0, 1.0}, preview_color);
-                    verts.emplace_back(preview_pos + Vector2{0.0f, preview_size.y}, Vector2{0.0f, 0.0f}, preview_color);
-                    verts.emplace_back(preview_pos + preview_size, Vector2{1.0f, 0.0f}, preview_color);
-                    verts.emplace_back(preview_pos + Vector2{preview_size.x, 0.0f}, Vector2{1.0f, 1.0f}, preview_color);
+                    verts.emplace_back(preview_pos, math::Vector2{0, 1.0}, preview_color);
+                    verts.emplace_back(preview_pos + math::Vector2{0.0f, preview_size.y}, math::Vector2{0.0f, 0.0f}, preview_color);
+                    verts.emplace_back(preview_pos + preview_size, math::Vector2{1.0f, 0.0f}, preview_color);
+                    verts.emplace_back(preview_pos + math::Vector2{preview_size.x, 0.0f}, math::Vector2{1.0f, 1.0f}, preview_color);
 
                     indices.push_back(0);
                     indices.push_back(1);
@@ -1328,10 +1334,10 @@ namespace anton::imgui {
                 viewport->draw_commands_buffer.emplace_back(cmd);
 
                 Vertex::Color const preview_color = color_to_vertex_color(ctx.default_style.preview_color);
-                verts.emplace_back(dockspace_content_pos, Vector2{0.0f, 1.0f}, preview_color);
-                verts.emplace_back(dockspace_content_pos + Vector2{0.0f, dockspace_content_size.y}, Vector2{0.0f, 0.0f}, preview_color);
-                verts.emplace_back(dockspace_content_pos + dockspace_content_size, Vector2{1.0f, 0.0f}, preview_color);
-                verts.emplace_back(dockspace_content_pos + Vector2{dockspace_content_size.x, 0.0f}, Vector2{1.0f, 1.0f}, preview_color);
+                verts.emplace_back(dockspace_content_pos, math::Vector2{0.0f, 1.0f}, preview_color);
+                verts.emplace_back(dockspace_content_pos + math::Vector2{0.0f, dockspace_content_size.y}, math::Vector2{0.0f, 0.0f}, preview_color);
+                verts.emplace_back(dockspace_content_pos + dockspace_content_size, math::Vector2{1.0f, 0.0f}, preview_color);
+                verts.emplace_back(dockspace_content_pos + math::Vector2{dockspace_content_size.x, 0.0f}, math::Vector2{1.0f, 1.0f}, preview_color);
                 indices.emplace_back(0);
                 indices.emplace_back(1);
                 indices.emplace_back(2);
@@ -1342,7 +1348,7 @@ namespace anton::imgui {
         }
     }
 
-    atl::Slice<Viewport* const> get_viewports(Context& ctx) {
+    Slice<Viewport* const> get_viewports(Context& ctx) {
         return ctx.viewports;
     }
 
@@ -1350,20 +1356,20 @@ namespace anton::imgui {
         return viewport.native_window;
     }
 
-    atl::Slice<Draw_Command const> get_viewport_draw_commands(Context&, Viewport& viewport) {
+    Slice<Draw_Command const> get_viewport_draw_commands(Context&, Viewport& viewport) {
         return viewport.draw_commands_buffer;
     }
 
-    atl::Slice<Vertex const> get_vertex_data(Context& ctx) {
+    Slice<Vertex const> get_vertex_data(Context& ctx) {
         return ctx.vertex_buffer;
     }
 
-    atl::Slice<u32 const> get_index_data(Context& ctx) {
+    Slice<u32 const> get_index_data(Context& ctx) {
         return ctx.index_buffer;
     }
 
     // TODO: remove new_viewport.
-    void begin_window(Context& ctx, atl::String_View identifier, bool new_viewport) {
+    void begin_window(Context& ctx, String_View identifier, bool new_viewport) {
         ANTON_VERIFY(ctx.current_window == -1, "Cannot create window inside another window.");
 
         i64 const id = hash_string(identifier);
@@ -1399,7 +1405,7 @@ namespace anton::imgui {
         ANTON_VERIFY(ctx.current_window != -1, "Cannot create widget because no window is current.");
 
         // Window& current_window = ctx.windows.at(ctx.current_window);
-        // current_window.widgets.emplace_back(ctx.current_widget, atl::String{}, ctx.default_style.widgets, Vector2{});
+        // current_window.widgets.emplace_back(ctx.current_widget, String{}, ctx.default_style.widgets, math::Vector2{});
         // ctx.current_widget = current_window.widgets.size() - 1;
     }
 
@@ -1410,23 +1416,23 @@ namespace anton::imgui {
         // ctx.current_widget = current_window.widgets[ctx.current_widget].parent;
     }
 
-    void text(Context& ctx, atl::String_View text, Font_Style font) {
+    void text(Context& ctx, String_View text, Font_Style font) {
         ANTON_VERIFY(ctx.current_window != -1, "No current window.");
     }
 
-    static Vector2 compute_text_dimensions(atl::String_View const text, Font_Style const style, f32 const max_width, bool const ignore_newline) {
+    static math::Vector2 compute_text_dimensions(String_View const text, Font_Style const style, f32 const max_width, bool const ignore_newline) {
         rendering::Face_Metrics const face_metrics = rendering::get_face_metrics(style.face);
         f32 const size_px = (f32)rendering::points_to_pixels(style.size * 64, style.v_dpi) / 64.0f;
         f32 const line_height = size_px * (f32)face_metrics.line_height / (f32)face_metrics.units_per_em;
         f32 const space_width = (f32)rendering::compute_text_width(style.face, {style.size, style.h_dpi, style.v_dpi}, u8" ") / 64.0f;
-        Vector2 text_dimensions = {0.0f, size_px * (f32)face_metrics.glyph_y_max / (f32)face_metrics.units_per_em};
+        math::Vector2 text_dimensions = {0.0f, size_px * (f32)face_metrics.glyph_y_max / (f32)face_metrics.units_per_em};
         f32 offset_x = 0;
         auto i = text.chars_begin();
         auto j = text.chars_begin();
         auto end = text.chars_end();
         while(i != end) {
             char32 const c = *i;
-            bool const whitespace = atl::is_whitespace(c);
+            bool const whitespace = is_whitespace(c);
             i64 const distance_to_end = end - i;
             if(!whitespace && end - i > 1) {
                 ++i;
@@ -1434,7 +1440,7 @@ namespace anton::imgui {
                 bool const should_end_line = !ignore_newline && c == U'\n';
                 // When i and j are unequal, we hit a whitespace preceded by a word.
                 if(i != j) {
-                    atl::String_View const word{j, distance_to_end > 1 ? i : i + 1};
+                    String_View const word{j, distance_to_end > 1 ? i : i + 1};
                     f32 const word_width = (f32)rendering::compute_text_width(style.face, {style.size, style.h_dpi, style.v_dpi}, word) / 64.0f;
                     bool const empty_line = offset_x == 0.0f;
                     bool const overflows_line = offset_x + space_width + word_width > max_width;
@@ -1463,20 +1469,20 @@ namespace anton::imgui {
         return text_dimensions;
     }
 
-    static void render_multiline_text(atl::String_View const text, Font_Style const style, Draw_Context& dc, Vector2 const base_draw_pos, f32 const max_width,
+    static void render_multiline_text(String_View const text, Font_Style const style, Draw_Context& dc, math::Vector2 const base_draw_pos, f32 const max_width,
                                       bool const ignore_newline) {
         rendering::Face_Metrics const face_metrics = rendering::get_face_metrics(style.face);
         f32 const size_px = (f32)rendering::points_to_pixels(style.size * 64, style.v_dpi) / 64.0f;
         f32 const line_height = size_px * (f32)(face_metrics.line_height) / (f32)face_metrics.units_per_em;
         f32 const space_width = (f32)rendering::compute_text_width(style.face, {style.size, style.h_dpi, style.v_dpi}, u8" ") / 64.0f;
         // We start at baseline.
-        Vector2 offset = {0.0f, size_px * (f32)face_metrics.glyph_y_max / (f32)face_metrics.units_per_em};
+        math::Vector2 offset = {0.0f, size_px * (f32)face_metrics.glyph_y_max / (f32)face_metrics.units_per_em};
         auto i = text.chars_begin();
         auto j = text.chars_begin();
         auto end = text.chars_end();
         while(i != end) {
             char32 const c = *i;
-            bool const whitespace = atl::is_whitespace(c);
+            bool const whitespace = is_whitespace(c);
             i64 const distance_to_end = end - i;
             if(!whitespace && distance_to_end > 1) {
                 ++i;
@@ -1484,7 +1490,7 @@ namespace anton::imgui {
                 bool const should_end_line = !ignore_newline && c == U'\n';
                 // When i and j are unequal, we hit a whitespace preceded by a word.
                 if(i != j) {
-                    atl::String_View const word{j, distance_to_end > 1 ? i : i + 1};
+                    String_View const word{j, distance_to_end > 1 ? i : i + 1};
                     f32 const word_width = (f32)rendering::compute_text_width(style.face, {style.size, style.h_dpi, style.v_dpi}, word) / 64.0f;
                     bool const empty_line = offset.x == 0.0f;
                     bool const overflows_line = offset.x + space_width + word_width > max_width;
@@ -1494,8 +1500,8 @@ namespace anton::imgui {
                         offset.y += line_height;
                     }
 
-                    atl::Vector<rendering::Glyph> const glyphs = rendering::render_text(style.face, {style.size, style.h_dpi, style.v_dpi}, word);
-                    Vector2 pen_offset = {0.0f, 0.0f};
+                    Vector<rendering::Glyph> const glyphs = rendering::render_text(style.face, {style.size, style.h_dpi, style.v_dpi}, word);
+                    math::Vector2 pen_offset = {0.0f, 0.0f};
                     for(rendering::Glyph const& glyph: glyphs) {
                         Draw_Command text_cmd;
                         text_cmd.texture = glyph.texture;
@@ -1503,14 +1509,14 @@ namespace anton::imgui {
                         text_cmd.vertex_offset = dc.vertex_buffer.size();
                         text_cmd.index_offset = dc.index_buffer.size();
                         dc.draw_commands.emplace_back(text_cmd);
-                        Vector2 const bearing_correction = {(f32)glyph.metrics.bearing_x / 64.0f, -(f32)glyph.metrics.bearing_y / 64.0f};
-                        Vector2 const draw_pos = base_draw_pos + offset + bearing_correction + pen_offset;
-                        Vector2 const glyph_dimensions = {(f32)glyph.metrics.width / 64.0f, (f32)glyph.metrics.height / 64.0f};
+                        math::Vector2 const bearing_correction = {(f32)glyph.metrics.bearing_x / 64.0f, -(f32)glyph.metrics.bearing_y / 64.0f};
+                        math::Vector2 const draw_pos = base_draw_pos + offset + bearing_correction + pen_offset;
+                        math::Vector2 const glyph_dimensions = {(f32)glyph.metrics.width / 64.0f, (f32)glyph.metrics.height / 64.0f};
                         Vertex::Color const color = Vertex::Color{0, 255, 120, 255};
-                        dc.vertex_buffer.emplace_back(draw_pos, Vector2{glyph.uv.left, glyph.uv.top}, color);
-                        dc.vertex_buffer.emplace_back(draw_pos + Vector2{0.0f, glyph_dimensions.y}, Vector2{glyph.uv.left, glyph.uv.bottom}, color);
-                        dc.vertex_buffer.emplace_back(draw_pos + glyph_dimensions, Vector2{glyph.uv.right, glyph.uv.bottom}, color);
-                        dc.vertex_buffer.emplace_back(draw_pos + Vector2{glyph_dimensions.x, 0.0f}, Vector2{glyph.uv.right, glyph.uv.top}, color);
+                        dc.vertex_buffer.emplace_back(draw_pos, math::Vector2{glyph.uv.left, glyph.uv.top}, color);
+                        dc.vertex_buffer.emplace_back(draw_pos + math::Vector2{0.0f, glyph_dimensions.y}, math::Vector2{glyph.uv.left, glyph.uv.bottom}, color);
+                        dc.vertex_buffer.emplace_back(draw_pos + glyph_dimensions, math::Vector2{glyph.uv.right, glyph.uv.bottom}, color);
+                        dc.vertex_buffer.emplace_back(draw_pos + math::Vector2{glyph_dimensions.x, 0.0f}, math::Vector2{glyph.uv.right, glyph.uv.top}, color);
                         dc.index_buffer.emplace_back(0);
                         dc.index_buffer.emplace_back(1);
                         dc.index_buffer.emplace_back(2);
@@ -1537,11 +1543,11 @@ namespace anton::imgui {
         }
     }
 
-    Button_State button(Context& ctx, atl::String_View text) {
+    Button_State button(Context& ctx, String_View text) {
         return button(ctx, text, ctx.default_style.button, ctx.default_style.hot_button, ctx.default_style.active_button);
     }
 
-    Button_State button(Context& ctx, atl::String_View text, Button_Style const inactive_style, Button_Style const hot_style, Button_Style const active_style) {
+    Button_State button(Context& ctx, String_View text, Button_Style const inactive_style, Button_Style const hot_style, Button_Style const active_style) {
         ANTON_VERIFY(ctx.current_window != -1, "No current window.");
         Window& window = ctx.windows.find(ctx.current_window)->value;
         Dockspace* const dockspace = window.dockspace;
@@ -1573,10 +1579,10 @@ namespace anton::imgui {
         // TODO: Text wrap
 
         Draw_Context& dc = window.draw_context;
-        Vector2 const border_draw_pos = dc.draw_pos;
-        Vector2 const dockspace_pos = get_dockspace_content_screen_pos(dockspace);
-        Vector2 const dockspace_size = get_dockspace_content_size(dockspace);
-        Vector2 const cursor = ctx.input.cursor_position;
+        math::Vector2 const border_draw_pos = dc.draw_pos;
+        math::Vector2 const dockspace_pos = get_dockspace_content_screen_pos(dockspace);
+        math::Vector2 const dockspace_size = get_dockspace_content_size(dockspace);
+        math::Vector2 const cursor = ctx.input.cursor_position;
 
         {
             f32 const button_padding_height = math::max(0.0f, style.padding[0]) + math::max(0.0f, style.padding[2]);
@@ -1584,9 +1590,9 @@ namespace anton::imgui {
             f32 const border_height = math::max(0.0f, style.border[0]) + math::max(0.0f, style.border[2]);
             f32 const border_width = math::max(0.0f, style.border[1]) + math::max(0.0f, style.border[3]);
             f32 const max_text_width = dockspace_size.x - dc.draw_pos.x - border_width - button_padding_width;
-            Vector2 const text_dimensions = compute_text_dimensions(text, style.font, max_text_width, true);
-            Vector2 const button_dimensions =
-                Vector2{text_dimensions.x + border_width + button_padding_width, text_dimensions.y + border_height + button_padding_height};
+            math::Vector2 const text_dimensions = compute_text_dimensions(text, style.font, max_text_width, true);
+            math::Vector2 const button_dimensions =
+                math::Vector2{text_dimensions.x + border_width + button_padding_width, text_dimensions.y + border_height + button_padding_height};
             bool const lmb = ctx.input.left_mouse_button;
             if(test_point_in_box(cursor, dockspace_pos + border_draw_pos, button_dimensions)) {
                 // TODO: Will report click even when the cursor hovers the button with lmb already pressed.
@@ -1608,11 +1614,11 @@ namespace anton::imgui {
         f32 const border_height = math::max(0.0f, style.border[0]) + math::max(0.0f, style.border[2]);
         f32 const border_width = math::max(0.0f, style.border[1]) + math::max(0.0f, style.border[3]);
         f32 const max_text_width = dockspace_size.x - dc.draw_pos.x - border_width - button_padding_width;
-        Vector2 const text_dimensions = compute_text_dimensions(text, style.font, max_text_width, true);
-        Vector2 const button_no_border_dimensions = Vector2{text_dimensions.x + button_padding_width, text_dimensions.y + button_padding_height};
-        Vector2 const button_dimensions =
-            Vector2{text_dimensions.x + border_width + button_padding_width, text_dimensions.y + border_height + button_padding_height};
-        Vector2 const button_draw_pos = border_draw_pos + Vector2{style.border[3], style.border[0]};
+        math::Vector2 const text_dimensions = compute_text_dimensions(text, style.font, max_text_width, true);
+        math::Vector2 const button_no_border_dimensions = math::Vector2{text_dimensions.x + button_padding_width, text_dimensions.y + button_padding_height};
+        math::Vector2 const button_dimensions =
+            math::Vector2{text_dimensions.x + border_width + button_padding_width, text_dimensions.y + border_height + button_padding_height};
+        math::Vector2 const button_draw_pos = border_draw_pos + math::Vector2{style.border[3], style.border[0]};
         Vertex::Color const bg_color = color_to_vertex_color(style.background_color);
         Vertex::Color const border_color = color_to_vertex_color(style.border_color);
         {
@@ -1621,14 +1627,14 @@ namespace anton::imgui {
             cmd.element_count = 12;
             cmd.vertex_offset = dc.vertex_buffer.size();
             cmd.index_offset = dc.index_buffer.size();
-            dc.vertex_buffer.emplace_back(border_draw_pos, Vector2{0.0f, 1.0f}, border_color);
-            dc.vertex_buffer.emplace_back(border_draw_pos + Vector2{0.0f, button_dimensions.y}, Vector2{0.0f, 0.0f}, border_color);
-            dc.vertex_buffer.emplace_back(border_draw_pos + button_dimensions, Vector2{1.0f, 0.0f}, border_color);
-            dc.vertex_buffer.emplace_back(border_draw_pos + Vector2{button_dimensions.x, 0.0f}, Vector2{1.0f, 1.0f}, border_color);
-            dc.vertex_buffer.emplace_back(button_draw_pos, Vector2{0.0f, 1.0f}, bg_color);
-            dc.vertex_buffer.emplace_back(button_draw_pos + Vector2{0.0f, button_no_border_dimensions.y}, Vector2{0.0f, 0.0f}, bg_color);
-            dc.vertex_buffer.emplace_back(button_draw_pos + button_no_border_dimensions, Vector2{1.0f, 0.0f}, bg_color);
-            dc.vertex_buffer.emplace_back(button_draw_pos + Vector2{button_no_border_dimensions.x, 0.0f}, Vector2{1.0f, 1.0f}, bg_color);
+            dc.vertex_buffer.emplace_back(border_draw_pos, math::Vector2{0.0f, 1.0f}, border_color);
+            dc.vertex_buffer.emplace_back(border_draw_pos + math::Vector2{0.0f, button_dimensions.y}, math::Vector2{0.0f, 0.0f}, border_color);
+            dc.vertex_buffer.emplace_back(border_draw_pos + button_dimensions, math::Vector2{1.0f, 0.0f}, border_color);
+            dc.vertex_buffer.emplace_back(border_draw_pos + math::Vector2{button_dimensions.x, 0.0f}, math::Vector2{1.0f, 1.0f}, border_color);
+            dc.vertex_buffer.emplace_back(button_draw_pos, math::Vector2{0.0f, 1.0f}, bg_color);
+            dc.vertex_buffer.emplace_back(button_draw_pos + math::Vector2{0.0f, button_no_border_dimensions.y}, math::Vector2{0.0f, 0.0f}, bg_color);
+            dc.vertex_buffer.emplace_back(button_draw_pos + button_no_border_dimensions, math::Vector2{1.0f, 0.0f}, bg_color);
+            dc.vertex_buffer.emplace_back(button_draw_pos + math::Vector2{button_no_border_dimensions.x, 0.0f}, math::Vector2{1.0f, 1.0f}, bg_color);
             dc.index_buffer.emplace_back(0);
             dc.index_buffer.emplace_back(1);
             dc.index_buffer.emplace_back(2);
@@ -1643,15 +1649,15 @@ namespace anton::imgui {
             dc.index_buffer.emplace_back(3 + 4);
             dc.draw_commands.emplace_back(cmd);
         }
-        dc.draw_pos += Vector2{0.0f, button_dimensions.y};
+        dc.draw_pos += math::Vector2{0.0f, button_dimensions.y};
 
-        Vector2 const text_draw_pos = button_draw_pos + Vector2{style.padding[3], style.padding[0]};
+        math::Vector2 const text_draw_pos = button_draw_pos + math::Vector2{style.padding[3], style.padding[0]};
         render_multiline_text(text, style.font, dc, text_draw_pos, max_text_width, true);
 
         return state;
     }
 
-    void image(Context& ctx, u64 const texture, Vector2 const size, Vector2 const uv_top_left, Vector2 const uv_bottom_right) {
+    void image(Context& ctx, u64 const texture, math::Vector2 const size, math::Vector2 const uv_top_left, math::Vector2 const uv_bottom_right) {
         ANTON_VERIFY(ctx.current_window != -1, "No current window.");
         Window& window = ctx.windows.find(ctx.current_window)->value;
         Dockspace* const dockspace = window.dockspace;
@@ -1659,15 +1665,15 @@ namespace anton::imgui {
             return;
         }
 
-        Vector2 const window_size = get_dockspace_content_size(window.dockspace);
+        math::Vector2 const window_size = get_dockspace_content_size(window.dockspace);
         Draw_Context& dc = window.draw_context;
-        Vector2 const draw_pos = dc.draw_pos;
-        Vector2 const window_space = window_size - draw_pos;
-        Vector2 const clipped_size = {math::min(window_space.x, size.x), math::min(window_space.y, size.y)};
-        Vector2 const uv_diff = uv_bottom_right - uv_top_left;
-        Vector2 const scale_fac = {clipped_size.x / size.x, clipped_size.y / size.y};
-        Vector2 const uv_br = uv_top_left + uv_diff * scale_fac;
-        Vector2 const uv_tl = uv_top_left;
+        math::Vector2 const draw_pos = dc.draw_pos;
+        math::Vector2 const window_space = window_size - draw_pos;
+        math::Vector2 const clipped_size = {math::min(window_space.x, size.x), math::min(window_space.y, size.y)};
+        math::Vector2 const uv_diff = uv_bottom_right - uv_top_left;
+        math::Vector2 const scale_fac = {clipped_size.x / size.x, clipped_size.y / size.y};
+        math::Vector2 const uv_br = uv_top_left + uv_diff * scale_fac;
+        math::Vector2 const uv_tl = uv_top_left;
 
         Draw_Command cmd;
         cmd.texture = texture;
@@ -1675,9 +1681,9 @@ namespace anton::imgui {
         cmd.vertex_offset = dc.vertex_buffer.size();
         cmd.index_offset = dc.index_buffer.size();
         dc.vertex_buffer.emplace_back(draw_pos, uv_tl, Vertex::Color{0, 0, 0, 0});
-        dc.vertex_buffer.emplace_back(draw_pos + Vector2{0.0f, clipped_size.y}, Vector2{uv_tl.x, uv_br.y}, Vertex::Color{0, 0, 0, 0});
+        dc.vertex_buffer.emplace_back(draw_pos + math::Vector2{0.0f, clipped_size.y}, math::Vector2{uv_tl.x, uv_br.y}, Vertex::Color{0, 0, 0, 0});
         dc.vertex_buffer.emplace_back(draw_pos + clipped_size, uv_br, Vertex::Color{0, 0, 0, 0});
-        dc.vertex_buffer.emplace_back(draw_pos + Vector2{clipped_size.x, 0.0f}, Vector2{uv_br.x, uv_tl.y}, Vertex::Color{0, 0, 0, 0});
+        dc.vertex_buffer.emplace_back(draw_pos + math::Vector2{clipped_size.x, 0.0f}, math::Vector2{uv_br.x, uv_tl.y}, Vertex::Color{0, 0, 0, 0});
         dc.index_buffer.emplace_back(0);
         dc.index_buffer.emplace_back(1);
         dc.index_buffer.emplace_back(2);
@@ -1686,7 +1692,7 @@ namespace anton::imgui {
         dc.index_buffer.emplace_back(3);
         dc.draw_commands.emplace_back(cmd);
 
-        dc.draw_pos += Vector2{0.0f, clipped_size.y};
+        dc.draw_pos += math::Vector2{0.0f, clipped_size.y};
     }
 
     // Get style of current widget or window
@@ -1713,20 +1719,20 @@ namespace anton::imgui {
         window.border_area_width = width;
     }
 
-    void set_window_size(Context& ctx, Vector2 const size) {
+    void set_window_size(Context& ctx, math::Vector2 const size) {
         ANTON_VERIFY(ctx.current_window != -1, "No current window.");
 
         Window& window = ctx.windows.find(ctx.current_window)->value;
         Dockspace* dockspace = window.dockspace;
         if(dockspace->layout_parent->tile_type == Layout_Tile_Type::root && dockspace->windows.size() == 1) {
-            Vector2 const tab_size = get_dockspace_tab_bar_size(dockspace);
-            Vector2 const new_size = size + Vector2{0.0f, tab_size.y};
+            math::Vector2 const tab_size = get_dockspace_tab_bar_size(dockspace);
+            math::Vector2 const new_size = size + math::Vector2{0.0f, tab_size.y};
             set_viewport_size(dockspace->viewport, new_size);
             recalculate_sublayout_size(window.dockspace->layout_parent);
         }
     }
 
-    void set_window_pos(Context& ctx, Vector2 const pos) {
+    void set_window_pos(Context& ctx, math::Vector2 const pos) {
         ANTON_VERIFY(ctx.current_window != -1, "No current window.");
 
         Window& window = ctx.windows.find(ctx.current_window)->value;
@@ -1748,13 +1754,13 @@ namespace anton::imgui {
         return ctx.active_window == ctx.current_window;
     }
 
-    Vector2 get_window_dimensions(Context& ctx) {
+    math::Vector2 get_window_dimensions(Context& ctx) {
         ANTON_VERIFY(ctx.current_window != -1, "No current window.");
         Window& window = ctx.windows.find(ctx.current_window)->value;
         return get_dockspace_content_size(window.dockspace);
     }
 
-    Vector2 get_cursor_position(Context& ctx) {
+    math::Vector2 get_cursor_position(Context& ctx) {
         return ctx.input.cursor_position;
     }
 } // namespace anton::imgui

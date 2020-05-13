@@ -1,0 +1,3 @@
+[submodule "dependencies/anton_core"]
+	path = dependencies/anton_core
+	url = https://github.com/kociap/anton_core.git
