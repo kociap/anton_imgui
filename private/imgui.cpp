@@ -1,4 +1,5 @@
 #include <anton/imgui.hpp>
+#include <anton/imgui_config.hpp>
 
 #include <anton/vector.hpp>
 #include <anton/string.hpp>
@@ -79,7 +80,7 @@ namespace anton::imgui {
     class Viewport {
     public:
         Context* context;
-        windowing::Window* native_window = nullptr;
+        Native_Window* native_window = nullptr;
         Vector<Draw_Command> draw_commands_buffer;
         Vector<Dockspace*> dockspaces;
         Layout_Root layout_root;
@@ -88,6 +89,7 @@ namespace anton::imgui {
     class Context {
     public:
         Flat_Hash_Map<i64, Window> windows;
+        Client_Interface* client;
         i64 hot_window = -1;
         i64 active_window = -1;
         // Currently bound window.
@@ -163,7 +165,7 @@ namespace anton::imgui {
 
         for(i64 i = 0; i < ctx->viewports.size(); ++i) {
             if(ctx->viewports[i] != ctx->main_viewport) {
-                windowing::destroy_window(ctx->viewports[i]->native_window);
+                ctx->client->destroy_window(ctx->viewports[i]->native_window);
             }
             delete ctx->viewports[i];
         }
@@ -171,7 +173,7 @@ namespace anton::imgui {
         delete ctx;
     }
 
-    static void _viewport_activate_callback(windowing::Window*, bool const activated, void* data) {
+    static void _viewport_activate_callback(Native_Window*, bool const activated, void* data) {
         if(activated) {
             Viewport* const viewport = (Viewport*)data;
             Context& ctx = *viewport->context;
@@ -188,8 +190,8 @@ namespace anton::imgui {
 
     static Viewport* create_viewport(Context& ctx, math::Vector2 const size, bool const decorated) {
         Viewport* viewport = new Viewport;
-        viewport->native_window = windowing::create_window(size.x, size.y, decorated);
-        windowing::set_window_activate_callback(viewport->native_window, _viewport_activate_callback, viewport);
+        viewport->native_window = ctx.client->create_window(size.x, size.y, decorated);
+        ctx.client->set_window_activate_callback(viewport->native_window, _viewport_activate_callback, viewport);
         viewport->context = &ctx;
         viewport->layout_root.tile_type = Layout_Tile_Type::root;
         viewport->layout_root.layout_parent = nullptr;
@@ -207,29 +209,31 @@ namespace anton::imgui {
             }
         }
 
-        windowing::destroy_window(viewport->native_window);
+        ctx.client->destroy_window(viewport->native_window);
         delete viewport;
     }
 
+    // TODO: Duplicate function.
     static math::Vector2 get_viewport_position(Viewport* const viewport) {
-        return windowing::get_window_pos(viewport->native_window);
+        return viewport->context->client->get_window_pos(viewport->native_window);
     }
 
     static math::Vector2 get_viewport_screen_pos(Viewport* const viewport) {
-        return windowing::get_window_pos(viewport->native_window);
+        return viewport->context->client->get_window_pos(viewport->native_window);
     }
 
     static math::Vector2 get_viewport_size(Viewport* const viewport) {
-        return windowing::get_window_size(viewport->native_window);
+        return viewport->context->client->get_window_size(viewport->native_window);
     }
 
     static void set_viewport_screen_pos(Viewport* const viewport, math::Vector2 const pos) {
-        windowing::set_window_pos(viewport->native_window, pos);
+        viewport->context->client->set_window_pos(viewport->native_window, pos);
     }
 
     static void set_viewport_size(Viewport* const viewport, math::Vector2 const size) {
-        windowing::set_size(viewport->native_window, size);
+        viewport->context->client->set_window_size(viewport->native_window, size);
         viewport->layout_root.size = size;
+        // TODO: Recalculate layout here so we don't have to call recalculate_sublayout manually?
     }
 
     // Doesn't verify whether the added dockspace is not already present.
@@ -729,10 +733,10 @@ namespace anton::imgui {
         add_dockspace(relative_to->viewport, dockspace);
     }
 
-    void set_main_viewport_native_window(Context& ctx, windowing::Window* window) {
+    void set_main_viewport_native_window(Context& ctx, Native_Window* window) {
         ANTON_VERIFY(window, "window is nullptr.");
         ctx.main_viewport->native_window = window;
-        windowing::set_window_activate_callback(ctx.main_viewport->native_window, _viewport_activate_callback, ctx.main_viewport);
+        ctx.client->set_window_activate_callback(ctx.main_viewport->native_window, _viewport_activate_callback, ctx.main_viewport);
         ctx.main_viewport->layout_root.size = get_viewport_size(ctx.main_viewport);
         recalculate_sublayout_size(&ctx.main_viewport->layout_root);
     }
@@ -1352,7 +1356,7 @@ namespace anton::imgui {
         return ctx.viewports;
     }
 
-    windowing::Window* get_viewport_native_window(Context&, Viewport& viewport) {
+    Native_Window* get_viewport_native_window(Context&, Viewport& viewport) {
         return viewport.native_window;
     }
 
@@ -1368,8 +1372,7 @@ namespace anton::imgui {
         return ctx.index_buffer;
     }
 
-    // TODO: remove new_viewport.
-    void begin_window(Context& ctx, String_View identifier, bool new_viewport) {
+    void begin_window(Context& ctx, String_View identifier) {
         ANTON_VERIFY(ctx.current_window == -1, "Cannot create window inside another window.");
 
         i64 const id = hash_string(identifier);
@@ -1420,11 +1423,15 @@ namespace anton::imgui {
         ANTON_VERIFY(ctx.current_window != -1, "No current window.");
     }
 
-    static math::Vector2 compute_text_dimensions(String_View const text, Font_Style const style, f32 const max_width, bool const ignore_newline) {
-        rendering::Face_Metrics const face_metrics = rendering::get_face_metrics(style.face);
-        f32 const size_px = (f32)rendering::points_to_pixels(style.size * 64, style.v_dpi) / 64.0f;
+    static i64 points_to_pixels(i64 points, i64 dpi) {
+        return points * dpi / 72;
+    }
+
+    static math::Vector2 compute_text_dimensions(Context& ctx, String_View const text, Font_Style const style, f32 const max_width, bool const ignore_newline) {
+        Face_Metrics const face_metrics = ctx.client->get_face_metrics(style.face);
+        f32 const size_px = (f32)points_to_pixels(style.size * 64, style.v_dpi) / 64.0f;
         f32 const line_height = size_px * (f32)face_metrics.line_height / (f32)face_metrics.units_per_em;
-        f32 const space_width = (f32)rendering::compute_text_width(style.face, {style.size, style.h_dpi, style.v_dpi}, u8" ") / 64.0f;
+        f32 const space_width = (f32)ctx.client->compute_text_width(style.face, {style.size, style.h_dpi, style.v_dpi}, u8" ") / 64.0f;
         math::Vector2 text_dimensions = {0.0f, size_px * (f32)face_metrics.glyph_y_max / (f32)face_metrics.units_per_em};
         f32 offset_x = 0;
         auto i = text.chars_begin();
@@ -1441,7 +1448,7 @@ namespace anton::imgui {
                 // When i and j are unequal, we hit a whitespace preceded by a word.
                 if(i != j) {
                     String_View const word{j, distance_to_end > 1 ? i : i + 1};
-                    f32 const word_width = (f32)rendering::compute_text_width(style.face, {style.size, style.h_dpi, style.v_dpi}, word) / 64.0f;
+                    f32 const word_width = (f32)ctx.client->compute_text_width(style.face, {style.size, style.h_dpi, style.v_dpi}, word) / 64.0f;
                     bool const empty_line = offset_x == 0.0f;
                     bool const overflows_line = offset_x + space_width + word_width > max_width;
                     bool const break_line = (!empty_line && overflows_line) || should_end_line;
@@ -1469,12 +1476,12 @@ namespace anton::imgui {
         return text_dimensions;
     }
 
-    static void render_multiline_text(String_View const text, Font_Style const style, Draw_Context& dc, math::Vector2 const base_draw_pos, f32 const max_width,
+    static void render_multiline_text(Context& ctx, String_View const text, Font_Style const style, Draw_Context& dc, math::Vector2 const base_draw_pos, f32 const max_width,
                                       bool const ignore_newline) {
-        rendering::Face_Metrics const face_metrics = rendering::get_face_metrics(style.face);
-        f32 const size_px = (f32)rendering::points_to_pixels(style.size * 64, style.v_dpi) / 64.0f;
+        Face_Metrics const face_metrics = ctx.client->get_face_metrics(style.face);
+        f32 const size_px = (f32)points_to_pixels(style.size * 64, style.v_dpi) / 64.0f;
         f32 const line_height = size_px * (f32)(face_metrics.line_height) / (f32)face_metrics.units_per_em;
-        f32 const space_width = (f32)rendering::compute_text_width(style.face, {style.size, style.h_dpi, style.v_dpi}, u8" ") / 64.0f;
+        f32 const space_width = (f32)ctx.client->compute_text_width(style.face, {style.size, style.h_dpi, style.v_dpi}, u8" ") / 64.0f;
         // We start at baseline.
         math::Vector2 offset = {0.0f, size_px * (f32)face_metrics.glyph_y_max / (f32)face_metrics.units_per_em};
         auto i = text.chars_begin();
@@ -1491,7 +1498,7 @@ namespace anton::imgui {
                 // When i and j are unequal, we hit a whitespace preceded by a word.
                 if(i != j) {
                     String_View const word{j, distance_to_end > 1 ? i : i + 1};
-                    f32 const word_width = (f32)rendering::compute_text_width(style.face, {style.size, style.h_dpi, style.v_dpi}, word) / 64.0f;
+                    f32 const word_width = (f32)ctx.client->compute_text_width(style.face, {style.size, style.h_dpi, style.v_dpi}, word) / 64.0f;
                     bool const empty_line = offset.x == 0.0f;
                     bool const overflows_line = offset.x + space_width + word_width > max_width;
                     bool const break_line = (!empty_line && overflows_line) || should_end_line;
@@ -1500,9 +1507,9 @@ namespace anton::imgui {
                         offset.y += line_height;
                     }
 
-                    Vector<rendering::Glyph> const glyphs = rendering::render_text(style.face, {style.size, style.h_dpi, style.v_dpi}, word);
+                    Vector<Glyph> const glyphs = ctx.client->render_text(style.face, {style.size, style.h_dpi, style.v_dpi}, word);
                     math::Vector2 pen_offset = {0.0f, 0.0f};
-                    for(rendering::Glyph const& glyph: glyphs) {
+                    for(Glyph const& glyph: glyphs) {
                         Draw_Command text_cmd;
                         text_cmd.texture = glyph.texture;
                         text_cmd.element_count = 6;
@@ -1590,7 +1597,7 @@ namespace anton::imgui {
             f32 const border_height = math::max(0.0f, style.border[0]) + math::max(0.0f, style.border[2]);
             f32 const border_width = math::max(0.0f, style.border[1]) + math::max(0.0f, style.border[3]);
             f32 const max_text_width = dockspace_size.x - dc.draw_pos.x - border_width - button_padding_width;
-            math::Vector2 const text_dimensions = compute_text_dimensions(text, style.font, max_text_width, true);
+            math::Vector2 const text_dimensions = compute_text_dimensions(ctx, text, style.font, max_text_width, true);
             math::Vector2 const button_dimensions =
                 math::Vector2{text_dimensions.x + border_width + button_padding_width, text_dimensions.y + border_height + button_padding_height};
             bool const lmb = ctx.input.left_mouse_button;
@@ -1614,7 +1621,7 @@ namespace anton::imgui {
         f32 const border_height = math::max(0.0f, style.border[0]) + math::max(0.0f, style.border[2]);
         f32 const border_width = math::max(0.0f, style.border[1]) + math::max(0.0f, style.border[3]);
         f32 const max_text_width = dockspace_size.x - dc.draw_pos.x - border_width - button_padding_width;
-        math::Vector2 const text_dimensions = compute_text_dimensions(text, style.font, max_text_width, true);
+        math::Vector2 const text_dimensions = compute_text_dimensions(ctx, text, style.font, max_text_width, true);
         math::Vector2 const button_no_border_dimensions = math::Vector2{text_dimensions.x + button_padding_width, text_dimensions.y + button_padding_height};
         math::Vector2 const button_dimensions =
             math::Vector2{text_dimensions.x + border_width + button_padding_width, text_dimensions.y + border_height + button_padding_height};
@@ -1652,7 +1659,7 @@ namespace anton::imgui {
         dc.draw_pos += math::Vector2{0.0f, button_dimensions.y};
 
         math::Vector2 const text_draw_pos = button_draw_pos + math::Vector2{style.padding[3], style.padding[0]};
-        render_multiline_text(text, style.font, dc, text_draw_pos, max_text_width, true);
+        render_multiline_text(ctx, text, style.font, dc, text_draw_pos, max_text_width, true);
 
         return state;
     }
