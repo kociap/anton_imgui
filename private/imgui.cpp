@@ -748,19 +748,19 @@ namespace anton::imgui {
 
     void set_default_style_default_dark(Context& ctx) {
         Style default_theme;
-        default_theme.background_color = {0.1f, 0.1f, 0.1f};
-        default_theme.preview_guides_color = {0.5f, 0.5f, 0.5f};
+        default_theme.background_color = {0.1f, 0.1f, 0.1f, 1.0f};
+        default_theme.preview_guides_color = {0.5f, 0.5f, 0.5f, 1.0f};
         default_theme.preview_color = {0.0f, 111.0f / 255.0f, 1.0f, 0.5f};
-        default_theme.widgets.background_color = {0.1f, 0.1f, 0.1f};
-        default_theme.button.background_color = {0.1f, 0.1f, 0.1f};
-        default_theme.button.border_color = {0.1f, 0.1f, 0.1f};
+        default_theme.widgets.background_color = {0.1f, 0.1f, 0.1f, 1.0f};
+        default_theme.button.background_color = {0.1f, 0.1f, 0.1f, 1.0f};
+        default_theme.button.border_color = {0.1f, 0.1f, 0.1f, 1.0f};
         default_theme.button.border = {0.0f, 0.0f, 0.0f, 0.0f};
         default_theme.button.padding = {0.0f, 0.0f, 0.0f, 0.0f};
         default_theme.button.font = ctx.default_font_style;
         default_theme.hot_button = default_theme.button;
-        default_theme.hot_button.background_color = {0.25f, 0.25f, 0.25f};
+        default_theme.hot_button.background_color = {0.25f, 0.25f, 0.25f, 1.0f};
         default_theme.active_button = default_theme.hot_button;
-        default_theme.active_button.background_color = {0.4f, 0.4f, 0.4f};
+        default_theme.active_button.background_color = {0.4f, 0.4f, 0.4f, 1.0f};
         ctx.default_style = default_theme;
     }
 
